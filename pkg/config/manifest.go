@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,10 +11,10 @@ import (
 	"strings"
 
 	"github.com/deislabs/porter/pkg/mixin"
-	multierror "github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/reflectwalk"
 	"github.com/pkg/errors"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 type Manifest struct {
@@ -136,6 +138,18 @@ type BundleConnection struct {
 }
 
 func (c *Config) ReadManifest(path string) (*Manifest, error) {
+	if strings.HasPrefix(path, "http") {
+		return c.readFromURL(path)
+	}
+
+	return c.readFromFile(path)
+}
+
+func (c *Config) readFromFile(path string) (*Manifest, error){
+	if exists, err := c.FileSystem.Exists(path); !exists {
+		return nil, errors.Wrapf(err, "could not find path: %s ", path)
+	}
+
 	data, err := c.FileSystem.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not read manifest at %q", path)
@@ -143,6 +157,28 @@ func (c *Config) ReadManifest(path string) (*Manifest, error) {
 
 	m := &Manifest{}
 	err = yaml.Unmarshal(data, m)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not parse manifest yaml in %q", path)
+	}
+	m.path = path
+
+	return m, nil
+}
+
+func (c *Config) readFromURL(path string) (*Manifest, error) {
+	resp, err := http.Get(path)
+	if err != nil {
+		return nil, errors.Wrapf(err,"could not reach url %s", path)
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not read from url %s", path)
+	}
+
+	m := &Manifest{}
+	err = yaml.Unmarshal(body, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not parse manifest yaml in %q", path)
 	}

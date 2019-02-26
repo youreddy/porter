@@ -8,6 +8,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestReadManifest_filepath(t *testing.T)  {
+	c := NewTestConfig(t)
+	c.TestContext.AddTestFile("testdata/simple.porter.yaml", Name)
+
+	m, err := c.ReadManifest(Name)
+	require.NoError(t, err)
+	assert.Equal(t, "hello" , m.Name)
+	assert.Equal(t, Name, m.path)
+}
+
+func TestReadManifest_url(t *testing.T)  {
+	c := NewTestConfig(t)
+
+	m, err := c.ReadManifest("https://raw.githubusercontent.com/deislabs/porter/master/pkg/config/testdata/porter.yaml")
+	require.NoError(t, err)
+	assert.Equal(t, "https://raw.githubusercontent.com/deislabs/porter/master/pkg/config/testdata/porter.yaml", m.path)
+}
+
 func TestLoadManifest(t *testing.T) {
 	c := NewTestConfig(t)
 	c.SetupPorterHome()
